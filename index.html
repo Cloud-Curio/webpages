@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive GitHub Copilot Rule Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: "Warm Neutral Harmony" - A calming palette with a light beige background, slate for text, subtle terracotta for primary actions, and gentle sage/sky for highlights. -->
+    <!-- Application Structure Plan: A dynamic "Rule Explorer" dashboard. The structure prioritizes task-oriented discovery over the source report's linear narrative. A top-level filter bar allows users to instantly select rules by category (e.g., Security, Testing). A real-time search bar provides granular highlighting of keywords. This non-linear, interactive approach was chosen because the primary user need is to quickly find specific, actionable guidance from a large set of rules, rather than reading the document from start to finish. This design transforms a static report into a practical, on-demand developer tool. -->
+    <!-- Visualization & Content Choices: The core of the application is an interactive grid of "Rule Cards" built with HTML/Tailwind and managed by JS. Goal: Organize/Inform. Interaction: Category filtering and keyword search. Justification: This is the most effective way to make 67 discrete text blocks navigable. Summary tables are presented in clean, collapsible HTML sections. Goal: Compare/Inform. Interaction: Show/Hide toggle. Justification: This presents dense comparative data clearly without cluttering the primary rule explorer interface. NO charts were used as the data is primarily textual and categorical, making interactive text presentation the superior method. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #FDFBF8; /* Warm off-white */
+            color: #4A5568; /* Slate Gray */
+        }
+        .highlight {
+            background-color: #FEF3C7; /* Soft yellow for highlighting */
+            border-radius: 4px;
+            padding: 0 2px;
+            transition: background-color 0.3s ease;
+        }
+        .rule-card {
+            transition: transform 0.2s ease-out, box-shadow 0.2s ease-out, opacity 0.3s ease-in-out;
+            opacity: 1;
+            transform: scale(1);
+        }
+        .rule-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .filter-btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .filter-btn.active {
+            background-color: #D97706; /* Terracotta-orange */
+            color: #FFFFFF;
+            font-weight: 600;
+        }
+        .rule-card.hidden {
+            opacity: 0;
+            transform: scale(0.95);
+            pointer-events: none;
+            height: 0;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            border: none;
+        }
+        #rulesGrid {
+            transition: all 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+
+        <header class="text-center mb-10">
+            <h1 class="text-4xl md:text-5xl font-bold text-gray-800 mb-2">Interactive Guide to GitHub Copilot</h1>
+            <p class="text-lg text-gray-600 max-w-3xl mx-auto">A searchable and filterable dashboard for the comprehensive rulebook on using GitHub Copilot effectively and responsibly in VS Code. Use the filters and search bar to quickly find the guidance you need.</p>
+        </header>
+
+        <section id="principles" class="mb-12">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">Core Principles</h2>
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-amber-600">
+                    <h3 class="font-bold text-lg mb-2 text-gray-800">Quality Input is Key</h3>
+                    <p class="text-gray-600">The quality of Copilot's output is directly linked to the quality of your input. Be clear, provide context, and actively manage the files Copilot sees to get the best results.</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-amber-600">
+                    <h3 class="font-bold text-lg mb-2 text-gray-800">You Are the Pilot</h3>
+                    <p class="text-gray-600">Copilot is an assistant, not a replacement. You are ultimately responsible for the code. Always review, understand, and test every suggestion before accepting it.</p>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md border-l-4 border-amber-600">
+                    <h3 class="font-bold text-lg mb-2 text-gray-800">Iterate and Adapt</h3>
+                    <p class="text-gray-600">Mastering Copilot is a process. If a suggestion isn't perfect, refine your prompt, break down the problem, or ask for alternatives. Evolve your approach with experience.</p>
+                </div>
+            </div>
+        </section>
+
+        <div class="sticky top-0 bg-[#FDFBF8]/90 backdrop-blur-sm z-10 py-4 mb-8">
+            <div id="controls" class="space-y-4">
+                <div id="search-container" class="relative">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3">
+                        <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                        </svg>
+                    </span>
+                    <input type="text" id="searchInput" placeholder="Search rules (e.g., 'security', 'refactor', 'prompt')..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-full focus:ring-amber-500 focus:border-amber-500 transition">
+                </div>
+                <div id="filter-container" class="flex flex-wrap justify-center gap-2">
+                </div>
+            </div>
+        </div>
+
+        <main id="rulesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        </main>
+        
+        <div id="no-results" class="hidden text-center py-16">
+            <h3 class="text-2xl font-semibold text-gray-700">No Rules Found</h3>
+            <p class="text-gray-500 mt-2">Try adjusting your search term or clearing the filters.</p>
+        </div>
+    </div>
+
+    <script>
+        const copilotRules = [
+            { id: 1, category: "Prompting", title: "Be Clear, Concise, and Specific in Prompts", content: "Ambiguity is the enemy of good AI suggestions. Prompts should clearly state the objective, provide necessary context, detail specific instructions or requirements, indicate the desired format for the output, and list any constraints." },
+            { id: 2, category: "Prompting", title: "Provide Sufficient Context", content: "Copilot's understanding is heavily influenced by the context it can access. Ensure that all relevant files for the current task are open in the IDE, while irrelevant ones are closed. Use context specifiers like `@workspace`, `#file`, or `#selection` in chat." },
+            { id: 3, category: "Prompting", title: "Break Down Complex Tasks", content: "For large or intricate features, decompose the problem into smaller, manageable sub-tasks. Present each sub-task to Copilot as a separate prompt for a more controlled and accurate generation process." },
+            { id: 4, category: "Prompting", title: "Iterate on Prompts and Suggestions", content: "The first suggestion may not be optimal. If the output is not ideal, refine the prompt, ask for alternatives, or request Copilot to modify its previous suggestion. This iterative dialogue is key." },
+            { id: 5, category: "Prompting", title: "Manage Chat History for Relevance", content: "To prevent irrelevant past interactions from impacting current suggestions, start new chat sessions for entirely new contexts or tasks." },
+            { id: 6, category: "Prompting", title: "Experiment with Different AI Models", content: "If your plan allows, try different AI models. Some are better for rapid edits, while others excel at complex reasoning. If one model struggles, switch to another." },
+            { id: 7, category: "Prompting", title: "Close Unrelated Tabs/Files", content: "Copilot considers all open files as active context. To prevent unintended suggestions, maintain a clean workspace by keeping only relevant files open." },
+            { id: 8, category: "Prompting", title: "Use Specific Context Tags Deliberately", content: "While `@workspace` is useful for broad awareness, prefer more specific tags like `#file` when your focus needs to be narrowed to a particular file or component." },
+            { id: 9, category: "Code Generation", title: "Always Review and Understand Generated Code", content: "This is paramount. All suggested code must be treated as a starting point and meticulously reviewed for logic, correctness, and efficiency. Use `/explain` to ensure full comprehension." },
+            { id: 10, category: "Code Generation", title: "Guide Copilot with Starter Code or Comments", content: "To steer suggestions, provide a clear function signature, a detailed comment describing the desired logic, or a few lines of initial code to establish a pattern." },
+            { id: 11, category: "Code Generation", title: "Check for Edge Cases and Error Handling", content: "Copilot may not spontaneously generate comprehensive error handling or consider all edge cases. You must remain vigilant and explicitly prompt for these aspects or add them manually." },
+            { id: 12, category: "Code Generation", title: "Prioritize Readability and Maintainability", content: "If a suggestion is overly complex or obscure, do not accept it as is. Ask Copilot to simplify it, refactor for clarity, or add explanatory comments." },
+            { id: 13, category: "Code Generation", title: "Be Mindful of Performance Implications", content: "Review generated code for potential performance bottlenecks, especially in loops or operations on large datasets. Prompt Copilot for optimizations if needed." },
+            { id: 14, category: "Refactoring", title: "Use Copilot for Initial Refactoring Ideas", content: "Highlight code and ask Copilot Chat for refactoring suggestions like, 'Refactor this for readability' or 'Can this be optimized?' to get valuable starting points." },
+            { id: 15, category: "Refactoring", title: "Leverage Copilot for PR Reviews (If Available)", content: "Some plans allow Copilot to review pull requests on GitHub.com. Remember its reviews are advisory and do not replace human oversight." },
+            { id: 16, category: "Refactoring", title: "Critically Evaluate Copilot's Review Comments", content: "Just like generated code, review comments are suggestions. Assess them for validity, relevance, and applicability to your project's context and standards." },
+            { id: 17, category: "Refactoring", title: "Use 'Review Selection' in VS Code", content: "For quick, targeted feedback, highlight code and use the 'GitHub Copilot: Review and Comment' command for a pre-flight check before committing." },
+            { id: 18, category: "Refactoring", title: "Apply Changes Incrementally", content: "When refactoring with Copilot, apply and test changes in small, incremental chunks. This is safer and more manageable than implementing sweeping modifications at once." },
+            { id: 19, category: "Testing", title: "Generate Unit Tests for New and Existing Code", content: "Speed up test creation by highlighting a function and using the context menu (Copilot > Generate Tests) or chat commands like `/tests`." },
+            { id: 20, category: "Testing", title: "Be Specific About Testing Focus", content: "If you need to test a specific pathway or a set of edge conditions, explicitly communicate this to Copilot in your prompt for more targeted tests." },
+            { id: 21, category: "Testing", title: "Provide Context for Test Generation", content: "Improve test accuracy by ensuring the code being tested has clear comments and by pointing Copilot to existing test patterns using `#file` references." },
+            { id: 22, category: "Testing", title: "Review and Augment Generated Tests", content: "Never trust generated tests blindly. Review them for correctness and completeness, and add missing test cases for complex business logic." },
+            { id: 23, category: "Testing", title: "Use Copilot to Help Fix Failing Tests", content: "Use the 'Fix Test Failure' feature in the Test Explorer or the `/fixTestFailure` command in chat to get suggestions for resolving test failures." },
+            { id: 24, category: "Testing", title: "Ask Copilot About Missing Tests", content: "Identify gaps in coverage by asking, 'Are there any scenarios or edge cases I’m not testing for in this function?'" },
+            { id: 25, category: "Testing", title: "Combine with Test Coverage Tools", content: "Use tools like Jest's coverage reporting to find uncovered code, then prompt Copilot specifically to generate tests for those areas to systematically improve coverage." },
+            { id: 26, category: "Security", title: "Always Scrutinize for Security Flaws", content: "Be vigilant for common vulnerabilities like SQL injection, XSS, and path traversal. If a suggestion seems risky, reject it or ask Copilot to regenerate it using secure practices." },
+            { id: 27, category: "Security", title: "Never Allow Hardcoded Secrets", content: "Meticulously check for hardcoded API keys, passwords, or credentials. Any such suggestion must be rejected. Always use secure secret management practices." },
+            { id: 28, category: "Security", title: "Validate and Sanitize All Inputs", content: "Any code that handles external input must include robust validation and sanitization. If Copilot doesn't include this by default, add it manually or explicitly prompt for it." },
+            { id: 29, category: "Security", title: "Be Wary of Outdated or Vulnerable Dependencies", content: "If Copilot suggests a third-party library, verify that it's current, maintained, and free from known vulnerabilities. Use tools like Dependabot." },
+            { id: 30, category: "Security", title: "Ask Copilot to Identify Attack Surfaces", content: "Leverage Copilot Chat to help find weaknesses. Use prompts like '@workspace what is the potential attack surface for this application?' to surface areas requiring inspection." },
+            { id: 31, category: "Security", title: "Understand the 'Rules File Backdoor' Vulnerability", content: "Be aware of attacks where hidden malicious instructions in AI rule files can trick Copilot into generating malicious code. Audit all rule files as if they were executable code." },
+            { id: 32, category: "Security", title: "Use Custom Instructions for Security", content: "If available, configure custom instructions to guide Copilot towards generating more secure code by default, such as specifying preferences for security libraries." },
+            { id: 33, category: "Security", title: "Screen Inputs and Outputs for Sensitive Data", content: "Implement practices to prevent sensitive internal data (proprietary algorithms, PII) from being fed as input to Copilot. Review suggestions to ensure they comply with data privacy policies." },
+            { id: 34, category: "Licensing", title: "Be Aware of Code Origin and Licensing", content: "Understand that Copilot is trained on a massive corpus of public code with a wide variety of open-source licenses. Be mindful of the terms of these licenses." },
+            { id: 35, category: "Licensing", title: "Enable 'Filter Suggestions Matching Public Code'", content: "Use the feature to filter out suggestions that closely match public code. This reduces the risk of inadvertently incorporating code with restrictive licenses." },
+            { id: 36, category: "Licensing", title: "Review for 'Near Matches' and Substantial Similarity", content: "Critically assess whether generated code is substantially similar to known open-source projects, especially those with copyleft licenses (e.g., GPL)." },
+            { id: 37, category: "Licensing", title: "Adhere to Organizational Policies", content: "Be aware of and strictly adhere to your organization's internal guidelines regarding the use of AI-powered coding tools and intellectual property." },
+            { id: 38, category: "Licensing", title: "Document Use of Copilot for Key Algorithms", content: "For critical or complex algorithms where Copilot provided significant input, it may be wise to maintain internal documentation of its use for future IP assessments." },
+            { id: 39, category: "Learning", title: "Use Copilot to Explore New Languages and Frameworks", content: "When learning something new, ask Copilot for syntax examples, concept explanations, and boilerplate code to get started more quickly." },
+            { id: 40, category: "Learning", title: "Actively Engage with Explanations", content: "Don't just accept code; understand it. Use Copilot's ability to explain code (e.g., `/explain`) to transform it into an interactive learning companion." },
+            { id: 41, category: "Learning", title: "Challenge and Verify Copilot's Suggestions", content: "Try to implement a solution yourself first, then compare it with Copilot's suggestion. Analyzing the differences is a highly instructive exercise." },
+            { id: 42, category: "Learning", title: "Avoid Over-Reliance; Prioritize Fundamental Understanding", content: "Copilot should supplement, not substitute, your fundamental understanding of programming concepts. Over-reliance can hinder long-term skill development." },
+            { id: 43, category: "Team Collab", title: "Establish Clear Organizational Usage Guidelines", content: "Teams should collaboratively define and document clear guidelines for how Copilot is to be used, including when it's appropriate and how to review suggestions." },
+            { id: 44, category: "Team Collab", title: "Utilize Organization-Specific Knowledge (Enterprise)", content: "If using Copilot Enterprise, take full advantage of its ability to draw context from your organization's private repositories for highly relevant suggestions." },
+            { id: 45, category: "Team Collab", title: "Use Copilot for Consistent Documentation", content: "Encourage all team members to use Copilot for generating and maintaining consistent code documentation, including comments, docstrings, and READMEs." },
+            { id: 46, category: "Team Collab", title: "Share Effective Prompts and Custom Instructions", content: "Create a shared knowledge base of effective prompts and custom instruction sets to standardize interactions and elevate the team's collective skill." },
+            { id: 47, category: "Team Collab", title: "Integrate Copilot into Code Review Processes", content: "Use Copilot's pull request review feature (if available) as a valuable input for human reviewers, potentially catching issues earlier." },
+            { id: 48, category: "Team Collab", title: "Configure Content Exclusions", content: "Administrators can configure content exclusions to prevent Copilot from accessing sensitive files or paths, protecting IP and other sensitive code." },
+            { id: 49, category: "Advanced", title: "Generate Documentation and Comments", content: "Copilot excels at generating docs. Prompt it to write inline comments, draft docstrings, create README sections, or even generate Mermaid diagram syntax." },
+            { id: 50, category: "Advanced", title: "Draft PR Summaries and Issue Descriptions", content: "Save time by having Copilot analyze code changes and draft an initial summary of a pull request's purpose and key modifications." },
+            { id: 51, category: "Advanced", title: "Create Scripts for Common Dev Tasks", content: "Prompt Copilot to generate utility scripts for repetitive tasks, such as shell scripts for file manipulation or Python scripts for data conversion." },
+            { id: 52, category: "Advanced", title: "Explore Alternative Solutions", content: "When stuck, describe the problem to Copilot and ask for different approaches, algorithms, or design patterns to help break through mental blocks." },
+            { id: 53, category: "Advanced", title: "Prototype Different Architectures", content: "Use Copilot to quickly sketch out the boilerplate for different architectural ideas, allowing for rapid comparison and evaluation of potential designs." },
+            { id: 54, category: "Advanced", title: "Generate Example Data or Mockups", content: "For testing, UI prototyping, or demos, ask Copilot to generate sample data in various formats like JSON, CSV, or XML." },
+            { id: 55, category: "Advanced", title: "Use 'Ask Mode' for Quick Questions", content: "Ideal for seeking quick answers, understanding code snippets, or clarifying concepts without Copilot directly modifying any code." },
+            { id: 56, category: "Advanced", title: "Employ 'Edit Mode' for Targeted Modifications", content: "Used when you have a clear intention for a code change. Highlight the code, type an instruction, and Copilot rewrites it, showing you a diff." },
+            { id: 57, category: "Advanced", title: "Experiment with 'Agent Mode' (with caution)", content: "Represents Copilot's most autonomous capability, handling high-level tasks by planning and executing steps across multiple files. Requires clear goals and careful oversight." },
+            { id: 58, category: "Advanced", title: "Define Personal Coding Style with Custom Instructions", content: "Use custom instructions to 'teach' Copilot your personal or team coding style preferences, making its default suggestions more aligned with your needs." },
+            { id: 59, category: "Advanced", title: "Create Reusable Prompt Files (.prompt.md)", content: "For complex or frequent tasks, create reusable prompt files to standardize the generation of complex components or adhere to specific design patterns." },
+            { id: 60, category: "Advanced", title: "Use Custom Instructions to Enforce Team Standards", content: "At an organization level, configure custom instructions to ensure Copilot's suggestions align with the team's established coding standards and best practices." },
+            { id: 61, category: "Implementation", title: "Begin with Simple Tasks", content: "If you're new to Copilot or these rules, start by applying them to simpler, well-defined coding tasks to gradually understand its response patterns." },
+            { id: 62, category: "Implementation", title: "Gradually Integrate More Complex Rules", content: "Don't try to implement all rules at once. Start with foundational rules (prompting, reviewing) and progressively incorporate more advanced techniques." },
+            { id: 63, category: "Implementation", title: "Discuss and Agree on Team-Wide Rules", content: "If in a team, collaboratively adopt a core set of usage guidelines that everyone agrees to follow to ensure consistency." },
+            { id: 64, category: "Implementation", title: "Share Learnings and Best Practices", content: "Establish channels for sharing effective prompts, useful configurations, and successful experiences to accelerate the team's overall proficiency." },
+            { id: 65, category: "Implementation", title: "Periodically Review and Update Your Rules", content: "Copilot evolves rapidly. Your rules must be a living document. Review and refine them periodically, especially when new features are released." },
+            { id: 66, category: "Implementation", title: "Stay Informed About New Features", content: "Follow official GitHub announcements, blogs, and documentation to stay informed about the latest developments and evolving best practices." },
+            { id: 67, category: "Implementation", title: "Acknowledge the Learning Curve", content: "Effectively using Copilot is a skill that takes time to develop. Patience and persistence in applying these rules are key to mastering it." }
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const rulesGrid = document.getElementById('rulesGrid');
+            const filterContainer = document.getElementById('filter-container');
+            const searchInput = document.getElementById('searchInput');
+            const noResults = document.getElementById('no-results');
+
+            let currentFilter = 'All';
+            let originalRuleHTML = new Map();
+
+            const categories = ['All', ...new Set(copilotRules.map(rule => rule.category))];
+
+            function renderRules() {
+                rulesGrid.innerHTML = '';
+                copilotRules.forEach(rule => {
+                    const card = document.createElement('article');
+                    card.className = 'rule-card bg-white p-6 rounded-lg shadow-md flex flex-col';
+                    card.dataset.id = rule.id;
+                    card.dataset.category = rule.category;
+
+                    const cardHTML = `
+                        <div class="flex-grow">
+                            <div class="flex justify-between items-start mb-3">
+                                <h3 class="text-lg font-bold text-gray-800 pr-4">${rule.id}. ${rule.title}</h3>
+                                <span class="category-tag text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-amber-600 bg-amber-200">${rule.category}</span>
+                            </div>
+                            <p class="text-gray-600">${rule.content}</p>
+                        </div>
+                    `;
+                    card.innerHTML = cardHTML;
+                    rulesGrid.appendChild(card);
+                    originalRuleHTML.set(rule.id, card.querySelector('p').innerHTML);
+                });
+            }
+
+            function renderFilters() {
+                filterContainer.innerHTML = '';
+                categories.forEach(category => {
+                    const button = document.createElement('button');
+                    button.textContent = category;
+                    button.className = 'filter-btn px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-full hover:bg-gray-50 focus:outline-none';
+                    if (category === 'All') {
+                        button.classList.add('active');
+                    }
+                    button.addEventListener('click', () => {
+                        currentFilter = category;
+                        document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+                        button.classList.add('active');
+                        filterAndSearch();
+                    });
+                    filterContainer.appendChild(button);
+                });
+            }
+
+            function filterAndSearch() {
+                const searchTerm = searchInput.value.toLowerCase().trim();
+                let visibleCount = 0;
+
+                rulesGrid.childNodes.forEach(card => {
+                    const ruleId = parseInt(card.dataset.id);
+                    const rule = copilotRules.find(r => r.id === ruleId);
+                    const p = card.querySelector('p');
+                    
+                    p.innerHTML = originalRuleHTML.get(ruleId);
+
+                    const categoryMatch = currentFilter === 'All' || card.dataset.category === currentFilter;
+                    const searchMatch = !searchTerm || rule.title.toLowerCase().includes(searchTerm) || rule.content.toLowerCase().includes(searchTerm);
+
+                    if (categoryMatch && searchMatch) {
+                        card.classList.remove('hidden');
+                        visibleCount++;
+
+                        if (searchTerm) {
+                            const regex = new RegExp(searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+                            const newText = p.innerHTML.replace(regex, `<span class="highlight">$&</span>`);
+                            p.innerHTML = newText;
+                        }
+
+                    } else {
+                        card.classList.add('hidden');
+                    }
+                });
+                
+                if(visibleCount === 0) {
+                    noResults.classList.remove('hidden');
+                } else {
+                    noResults.classList.add('hidden');
+                }
+            }
+
+            searchInput.addEventListener('input', filterAndSearch);
+
+            renderRules();
+            renderFilters();
+        });
+    </script>
+</body>
+</html>
